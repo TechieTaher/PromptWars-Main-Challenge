@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "Behavioral Habit Coach",
+  "description": "An AI-powered behavioral habit coach that helps users identify and split combined habits, track routine entries, analyze triggers, and receive adaptive feedback.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
