@@ -82,6 +82,14 @@ export const plans = pgTable('plans', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const dynamicQAs = pgTable('dynamic_qas', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id).notNull(),
+  question: text('question').notNull(),
+  answer: text('answer'), // nullable until answered
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const usersRelations = relations(users, ({ one, many }) => ({
   routineEntries: many(routineEntries),
   habits: many(habits),
@@ -91,6 +99,7 @@ export const usersRelations = relations(users, ({ one, many }) => ({
   coachMessages: many(coachMessages),
   nudges: many(nudges),
   plans: many(plans),
+  dynamicQAs: many(dynamicQAs),
 }));
 
 export const habitsRelations = relations(habits, ({ one, many }) => ({

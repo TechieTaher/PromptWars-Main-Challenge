@@ -10,7 +10,7 @@ if (!sqlHost || !sqlDbName || !user || !password) {
 }
 
 export default defineConfig({
-  schema: "./src/db/schema",
+  schema: "./src/db/schema.ts",
   out: "./drizzle",
   dialect: "postgresql",
   schemaFilter: ["public"],

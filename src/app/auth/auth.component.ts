@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Component, inject } from '@angular/core';
 import { auth, googleAuthProvider } from '../shared/firebase';
 import { signInWithPopup } from 'firebase/auth';

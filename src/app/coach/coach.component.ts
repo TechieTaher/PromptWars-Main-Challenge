@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Component, inject, OnInit, signal, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { ApiService } from '../shared/api.service';
 import { FormsModule } from '@angular/forms';
@@ -9,9 +10,15 @@ import { DatePipe } from '@angular/common';
   imports: [FormsModule, DatePipe],
   template: `
     <div class="flex flex-col h-full bg-zinc-950">
-      <div class="p-6 border-b border-zinc-800 bg-zinc-950 sticky top-0 z-10 shadow-sm">
-        <h1 class="text-2xl font-semibold tracking-tight">AI Coach</h1>
-        <p class="text-zinc-400 mt-1 text-sm">Your personalized guide to stay on track.</p>
+      <div class="p-6 border-b border-zinc-800 bg-zinc-950 sticky top-0 z-10 shadow-sm flex justify-between items-center">
+        <div>
+          <h1 class="text-2xl font-semibold tracking-tight">AI Coach</h1>
+          <p class="text-zinc-400 mt-1 text-sm">Your personalized guide to stay on track.</p>
+        </div>
+        <button (click)="newChat()" class="px-4 py-2 border border-zinc-700 hover:border-emerald-500 rounded-xl text-sm font-medium text-zinc-300 hover:text-emerald-400 transition-colors flex items-center gap-2" id="btn-new-chat">
+          <span class="material-icons text-[18px]">chat</span>
+          New Chat
+        </button>
       </div>
       
       <div class="flex-1 overflow-y-auto p-6 space-y-6" #scrollContainer>
@@ -99,7 +106,7 @@ export class CoachComponent implements OnInit, AfterViewChecked {
       if (this.scrollContainer) {
         this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
       }
-    } catch(err) { }
+    } catch { /* ignore */ }
   }
 
   sendMessage() {
@@ -121,5 +128,13 @@ export class CoachComponent implements OnInit, AfterViewChecked {
         this.sending.set(false);
       }
     });
+  }
+
+  newChat() {
+    if (confirm('Are you sure you want to clear your current conversation history and start a new chat?')) {
+      this.api.post('/api/coach/clear', {}).subscribe(() => {
+        this.messages.set([]);
+      });
+    }
   }
 }

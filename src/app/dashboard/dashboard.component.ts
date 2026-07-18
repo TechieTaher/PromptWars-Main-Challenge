@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ApiService } from '../shared/api.service';
 import { Router } from '@angular/router';
@@ -47,8 +48,8 @@ import { DatePipe } from '@angular/common';
           <div class="space-y-4">
             @if (habits().length > 0) {
               <div>
-                <label class="block text-sm font-medium text-zinc-400 mb-1">Habit</label>
-                <select [value]="selectedHabitId()" (change)="onHabitChange($event)" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-zinc-100 focus:outline-none focus:border-emerald-500">
+                <label for="checkin-habit" class="block text-sm font-medium text-zinc-400 mb-1">Habit</label>
+                <select id="checkin-habit" [value]="selectedHabitId()" (change)="onHabitChange($event)" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-zinc-100 focus:outline-none focus:border-emerald-500">
                   <option [value]="0" disabled>Select a habit...</option>
                   @for (habit of habits(); track habit.id) {
                     <option [value]="habit.id">{{ habit.name }}</option>
@@ -57,7 +58,7 @@ import { DatePipe } from '@angular/common';
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-zinc-400 mb-1">Did you slip?</label>
+                <span class="block text-sm font-medium text-zinc-400 mb-1">Did you slip?</span>
                 <div class="flex gap-4">
                   <button (click)="slipped.set(false)" [class.bg-emerald-600]="!slipped()" [class.text-white]="!slipped()" [class.bg-zinc-950]="slipped()" class="flex-1 py-2 rounded-xl border border-zinc-800 transition-colors">No, stayed strong</button>
                   <button (click)="slipped.set(true)" [class.bg-red-600]="slipped()" [class.text-white]="slipped()" [class.bg-zinc-950]="!slipped()" class="flex-1 py-2 rounded-xl border border-zinc-800 transition-colors">Yes, slipped</button>
@@ -65,8 +66,8 @@ import { DatePipe } from '@angular/common';
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-zinc-400 mb-1">Craving Intensity (1-5)</label>
-                <input type="range" min="1" max="5" [value]="cravingIntensity()" (input)="onIntensityChange($event)" class="w-full accent-emerald-500">
+                <label for="checkin-craving" class="block text-sm font-medium text-zinc-400 mb-1">Craving Intensity (1-5)</label>
+                <input id="checkin-craving" type="range" min="1" max="5" [value]="cravingIntensity()" (input)="onIntensityChange($event)" class="w-full accent-emerald-500">
                 <div class="flex justify-between text-xs text-zinc-500 mt-1">
                   <span>None</span>
                   <span>{{ cravingIntensity() }}</span>
@@ -75,8 +76,8 @@ import { DatePipe } from '@angular/common';
               </div>
 
               <div>
-                <label class="block text-sm font-medium text-zinc-400 mb-1">Mood</label>
-                <input type="text" [value]="mood()" (input)="onMoodChange($event)" placeholder="How are you feeling?" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-zinc-100 focus:outline-none focus:border-emerald-500">
+                <label for="checkin-mood" class="block text-sm font-medium text-zinc-400 mb-1">Mood</label>
+                <input id="checkin-mood" type="text" [value]="mood()" (input)="onMoodChange($event)" placeholder="How are you feeling?" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-zinc-100 focus:outline-none focus:border-emerald-500">
               </div>
 
               <button (click)="submitCheckIn()" [disabled]="!selectedHabitId() || checkInLoading()" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors disabled:opacity-50 mt-4 flex justify-center items-center gap-2">

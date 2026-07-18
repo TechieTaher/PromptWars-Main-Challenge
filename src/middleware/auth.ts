@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Request, Response, NextFunction } from 'express';
 import { adminAuth } from '../lib/firebase-admin';
 import { DecodedIdToken } from 'firebase-admin/auth';

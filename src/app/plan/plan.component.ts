@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ApiService } from '../shared/api.service';
 import { DatePipe } from '@angular/common';

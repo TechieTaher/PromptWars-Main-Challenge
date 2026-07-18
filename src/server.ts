@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   AngularNodeAppEngine,
   createNodeRequestHandler,
@@ -8,8 +9,9 @@ import express, { Request, Response, NextFunction } from 'express';
 import {join} from 'node:path';
 import { requireAuth, AuthRequest } from './middleware/auth';
 import { db } from './db/index';
-import { checkIns, habits, triggers, routineEntries, plans, nudges, coachMessages, motivationProfiles } from './db/schema';
-import { generateInitialPlan, generateNudge, generateCoachReply, revisePlan } from './server/gemini.service';
+import { checkIns, habits, triggers, routineEntries, plans, nudges, coachMessages, motivationProfiles, dynamicQAs } from './db/schema';
+import { generateInitialPlan, generateNudge, generateCoachReply, revisePlan, generateDeepDiveQuestions } from './server/gemini.service';
+import { runMultiAgentHabitSplitter } from './server/agents.service';
 import { eq, desc } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -178,6 +180,51 @@ app.get('/api/coach/history', requireAuth, async (req: AuthRequest, res: Respons
   }
 });
 
+app.post('/api/coach/clear', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.dbUser.id;
+    await db.delete(coachMessages).where(eq(coachMessages.userId, userId));
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/agents/combined-habits', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.dbUser.id;
+    const userHabits = await db.select().from(habits).where(eq(habits.userId, userId));
+    // Filter habits that contain "and", "or", or a comma ","
+    const combined = userHabits.filter(h => 
+      h.name.toLowerCase().includes('and') || 
+      h.name.toLowerCase().includes('or') || 
+      h.name.includes(',')
+    );
+    res.json(combined);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/agents/split-habit', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.dbUser.id;
+    const { habitId, additionalAnswer } = req.body;
+    if (!habitId) {
+      res.status(400).json({ error: 'habitId is required' });
+      return;
+    }
+    const result = await runMultiAgentHabitSplitter(userId, Number(habitId), additionalAnswer);
+    res.json(result);
+  } catch (error) {
+    console.error('Multi-agent split-habit failed:', error);
+    res.status(500).json({ 
+      error: 'Internal server error', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
+  }
+});
+
 app.get('/api/habits', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userHabits = await db.select().from(habits).where(eq(habits.userId, req.dbUser.id));
@@ -269,6 +316,48 @@ app.get('/api/plans', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userPlans = await db.select().from(plans).where(eq(plans.userId, req.dbUser.id)).orderBy(desc(plans.version));
     res.json(userPlans);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/deep-dive', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const qas = await db.select().from(dynamicQAs).where(eq(dynamicQAs.userId, req.dbUser.id)).orderBy(dynamicQAs.createdAt);
+    res.json(qas);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/deep-dive/generate', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.dbUser.id;
+    const userHabits = await db.select().from(habits).where(eq(habits.userId, userId));
+    const userRoutine = await db.select().from(routineEntries).where(eq(routineEntries.userId, userId));
+    const userTriggers = await db.select().from(triggers).where(eq(triggers.userId, userId));
+    const previousQAs = await db.select().from(dynamicQAs).where(eq(dynamicQAs.userId, userId));
+    
+    const context = { habits: userHabits, routine: userRoutine, triggers: userTriggers };
+    const questions = await generateDeepDiveQuestions(userId, previousQAs, context);
+    
+    for (const q of questions) {
+      await db.insert(dynamicQAs).values({ userId, question: q });
+    }
+    
+    res.json({ success: true, count: questions.length });
+  } catch (error) {
+    console.error('Failed to generate deep dive', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/deep-dive/:id/answer', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const qaId = Number(req.params.id);
+    const { answer } = req.body;
+    await db.update(dynamicQAs).set({ answer }).where(eq(dynamicQAs.id, qaId));
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }

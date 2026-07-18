@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { GoogleGenAI } from '@google/genai';
 import { db } from '../db/index';
 import { checkIns, triggers, plans } from '../db/schema';
@@ -78,6 +79,39 @@ Respond to the user as the coach.`;
   });
 
   return response.text;
+}
+
+export async function generateDeepDiveQuestions(userId: number, previousQAs: any[], userContext: any) {
+  const prompt = `You are an expert psychological coach seeking to deeply understand your client.
+The user has provided some initial context about their habits, routines, and triggers:
+${JSON.stringify(userContext, null, 2)}
+
+And they have previously answered these questions:
+${JSON.stringify(previousQAs, null, 2)}
+
+Please generate exactly 10 new, thought-provoking questions to help uncover deeper motivations, hidden triggers, or underlying psychological patterns related to their habits and daily routine.
+
+Return JSON strictly in the following format:
+{
+  "questions": [
+    "Question 1",
+    "Question 2",
+    ...
+  ]
+}`;
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+    }
+  });
+
+  if (response.text) {
+     return JSON.parse(response.text).questions;
+  }
+  return [];
 }
 
 export async function revisePlan(userId: number) {
