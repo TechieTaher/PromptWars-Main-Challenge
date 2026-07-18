@@ -34,14 +34,7 @@
             "outputMode": "server",
             "ssr": {
               "entry": "src/server.ts"
-            },
-            "externalDependencies": [
-              "@google/genai",
-              "firebase-admin",
-              "firebase-admin/app",
-              "firebase-admin/auth",
-              "pg"
-            ]
+            }
           },
           "configurations": {
             "production": {
@@ -64,11 +57,7 @@
               "extractLicenses": false,
               "sourceMap": true,
               "externalDependencies": [
-                "@google/genai",
-                "firebase-admin",
-                "firebase-admin/app",
-                "firebase-admin/auth",
-                "pg"
+                "@google/genai"
               ]
             }
           },
