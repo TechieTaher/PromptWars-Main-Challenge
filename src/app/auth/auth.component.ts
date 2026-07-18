@@ -35,9 +35,22 @@ export class AuthComponent {
     this.errorMessage = '';
     try {
       const result = await signInWithPopup(auth, googleAuthProvider);
-      // Wait, we need to know if it's the first time to redirect to onboarding.
-      // For now, we'll route to dashboard, and dashboard will redirect if no plans are found.
-      this.router.navigate(['/dashboard']);
+      const idToken = await result.user.getIdToken();
+      
+      const response = await fetch('/api/plans', {
+        headers: { 'Authorization': `Bearer ${idToken}` }
+      });
+      
+      if (response.ok) {
+        const userPlans = await response.json();
+        if (userPlans && userPlans.length > 0) {
+          this.router.navigate(['/dashboard']);
+        } else {
+          this.router.navigate(['/onboarding']);
+        }
+      } else {
+        this.router.navigate(['/onboarding']);
+      }
     } catch (error: any) {
       console.error('Login failed', error);
       if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-blocked') {

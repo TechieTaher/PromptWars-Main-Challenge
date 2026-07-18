@@ -19,29 +19,37 @@ import { ApiService } from '../shared/api.service';
         </div>
 
         <div class="p-8 rounded-2xl bg-zinc-900 border border-zinc-800 shadow-xl">
-          <h2 class="text-2xl font-semibold mb-6">{{ currentQuestion().text }}</h2>
-          
           <form [formGroup]="form" (ngSubmit)="nextStep()">
-            @if (currentQuestion().type === 'textarea') {
-              <textarea 
-                [formControlName]="currentQuestion().controlName" 
-                class="w-full h-32 bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-zinc-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-                placeholder="Type your answer here..."
-              ></textarea>
-            } @else if (currentQuestion().type === 'number') {
-              <input 
-                type="number"
-                [formControlName]="currentQuestion().controlName" 
-                class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-zinc-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-                min="1" max="10"
-              />
-            } @else {
-              <input 
-                type="text"
-                [formControlName]="currentQuestion().controlName" 
-                class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-zinc-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-                placeholder="Type your answer here..."
-              />
+            @for (q of questions; track q.controlName; let i = $index) {
+              @if (i === currentStep()) {
+                <div class="mb-6">
+                  <label [for]="q.controlName" class="block text-2xl font-semibold mb-6">{{ q.text }}</label>
+                  @if (q.type === 'textarea') {
+                    <textarea 
+                      [id]="q.controlName"
+                      [formControlName]="q.controlName" 
+                      class="w-full h-32 bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-zinc-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                      placeholder="Type your answer here..."
+                    ></textarea>
+                  } @else if (q.type === 'number') {
+                    <input 
+                      [id]="q.controlName"
+                      type="number"
+                      [formControlName]="q.controlName" 
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-zinc-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                      min="1" max="10"
+                    />
+                  } @else {
+                    <input 
+                      [id]="q.controlName"
+                      type="text"
+                      [formControlName]="q.controlName" 
+                      class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-zinc-100 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                      placeholder="Type your answer here..."
+                    />
+                  }
+                </div>
+              }
             }
 
             <div class="mt-8 flex justify-between">

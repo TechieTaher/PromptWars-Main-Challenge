@@ -1,11 +1,12 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { ApiService } from '../shared/api.service';
 import { DatePipe } from '@angular/common';
+import { MarkdownPipe } from '../shared/markdown.pipe';
 
 @Component({
   selector: 'app-plan',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, MarkdownPipe],
   template: `
     <div class="p-8 max-w-4xl mx-auto w-full">
       <h1 class="text-3xl font-semibold tracking-tight mb-8">My Coaching Plan</h1>
@@ -18,8 +19,7 @@ import { DatePipe } from '@angular/common';
               <div class="text-zinc-400 text-sm">Updated {{ plans()[0].createdAt | date:'mediumDate' }}</div>
             </div>
           </div>
-          <div class="p-8 prose prose-invert prose-emerald max-w-none whitespace-pre-wrap leading-relaxed text-zinc-300">
-            {{ plans()[0].content }}
+          <div class="p-8 prose prose-invert prose-emerald max-w-none leading-relaxed text-zinc-300" [innerHTML]="plans()[0].content | markdown">
           </div>
         </div>
 
@@ -39,8 +39,7 @@ import { DatePipe } from '@angular/common';
                 </div>
                 <details class="text-sm">
                   <summary class="cursor-pointer text-emerald-500 hover:text-emerald-400 outline-none">View full plan</summary>
-                  <div class="mt-4 whitespace-pre-wrap text-zinc-400 pl-4 border-l-2 border-zinc-800">
-                    {{ plan.content }}
+                  <div class="mt-4 text-zinc-400 pl-4 border-l-2 border-zinc-800 prose prose-invert prose-emerald max-w-none" [innerHTML]="plan.content | markdown">
                   </div>
                 </details>
               </div>
