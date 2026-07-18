@@ -43,101 +43,6 @@ import { FormsModule } from '@angular/forms';
         </section>
       }
 
-      <!-- Multi-Agent Habit Refiner & Splitter -->
-      <section class="bg-indigo-950/20 border border-indigo-900/50 rounded-2xl p-6 shadow-sm" id="sec-multi-agent">
-        <div class="flex items-center gap-2 mb-4">
-          <span class="material-icons text-emerald-400">psychology</span>
-          <h2 class="text-xl font-medium text-emerald-100">Multi-Agent Habit Refiner & Splitter</h2>
-        </div>
-        <p class="text-zinc-400 text-sm mb-6 leading-relaxed">
-          Some habits entered during onboarding might combine multiple actions (like <strong>"using phone, and sleep schedule"</strong>). 
-          Our Root Coordinator Agent can delegate to specialist agents (Extractor, Modeler, Data Synchronizer) to analyze and split them into separate detailed habits, routine entries, and triggers.
-        </p>
-
-        @if (combinedHabits().length === 0) {
-          <div class="p-4 bg-zinc-900/50 border border-zinc-800/80 rounded-xl text-zinc-400 text-sm flex items-center gap-2">
-            <span class="material-icons text-emerald-500">check_circle</span>
-            No combined habits detected! All your habits look distinct and fully split.
-          </div>
-        } @else {
-          <div class="space-y-4">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label for="select-split-habit" class="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Select Combined Habit to Split</label>
-                <select id="select-split-habit" [ngModel]="selectedHabitId()" (ngModelChange)="selectedHabitId.set($event)" class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:border-emerald-500 outline-none">
-                  @for (h of combinedHabits(); track h.id) {
-                    <option [value]="h.id">{{ h.name }}</option>
-                  }
-                </select>
-              </div>
-
-              <div>
-                <label for="input-split-additional" class="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-2">Additional Explanation / Answer (Optional)</label>
-                <input id="input-split-additional" type="text" [(ngModel)]="additionalExplanation" placeholder="e.g., I scroll my phone late in bed which delays sleep." class="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:border-emerald-500 outline-none">
-              </div>
-            </div>
-
-            <button (click)="runMultiAgentSplit()" [disabled]="splitting()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50" id="btn-run-split">
-              <span class="material-icons">diversity_3</span>
-              {{ splitting() ? 'Executing Multi-Agent Graph...' : 'Execute Multi-Agent Splitter' }}
-            </button>
-          </div>
-        }
-
-        <!-- Split Progress and Results -->
-        @if (splitting()) {
-          <div class="mt-6 border-t border-indigo-900/40 pt-6 space-y-4 animate-pulse">
-            <h3 class="text-sm font-semibold text-zinc-300 uppercase tracking-wider">Agents Execution Log (Graph Orchestration)</h3>
-            <div class="space-y-3">
-              <div class="flex items-center gap-3 text-xs text-indigo-300 bg-indigo-950/40 p-3 rounded-lg border border-indigo-900/30">
-                <span class="material-icons animate-spin text-[16px]">refresh</span>
-                <span>[Root Coordinator Agent] Activating agent graph and preparing workspace tools...</span>
-              </div>
-              <div class="flex items-center gap-3 text-xs text-zinc-500 bg-zinc-900/30 p-3 rounded-lg border border-zinc-800/30">
-                <span class="material-icons text-[16px]">hourglass_empty</span>
-                <span>[Habit Extractor & Splitter Agent] Awaiting extraction schema split task...</span>
-              </div>
-              <div class="flex items-center gap-3 text-xs text-zinc-500 bg-zinc-900/30 p-3 rounded-lg border border-zinc-800/30">
-                <span class="material-icons text-[16px]">hourglass_empty</span>
-                <span>[Routine & Trigger Modeler Agent] Awaiting behavioral design task...</span>
-              </div>
-              <div class="flex items-center gap-3 text-xs text-zinc-500 bg-zinc-900/30 p-3 rounded-lg border border-zinc-800/30">
-                <span class="material-icons text-[16px]">hourglass_empty</span>
-                <span>[Data Synchronizer Tool] Awaiting database insert execution call...</span>
-              </div>
-            </div>
-          </div>
-        }
-
-        @if (splitResult()) {
-          <div class="mt-6 border-t border-indigo-900/40 pt-6 space-y-4">
-            <div class="p-4 bg-emerald-950/20 border border-emerald-900/40 rounded-xl text-emerald-300 text-sm flex items-start gap-3">
-              <span class="material-icons text-emerald-400 mt-0.5">verified</span>
-              <div>
-                <p class="font-semibold text-emerald-200">Execution Successful!</p>
-                <p class="mt-1 text-xs leading-relaxed text-emerald-400/90">{{ splitResult().message }}</p>
-              </div>
-            </div>
-
-            <div class="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 space-y-3">
-              <h3 class="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 flex items-center gap-1">
-                <span class="material-icons text-[14px]">history_edu</span>
-                Agent Collaboration Steps (Proof of Work)
-              </h3>
-              @for (step of splitResult().steps; track step.description) {
-                <div class="border-l-2 border-indigo-500 pl-4 py-1">
-                  <div class="flex justify-between items-center">
-                    <span class="text-xs font-semibold text-indigo-300">{{ step.agent }}</span>
-                    <span class="text-[10px] bg-indigo-950 text-indigo-400 px-2 py-0.5 rounded-full uppercase tracking-wider border border-indigo-900/50">{{ step.action }}</span>
-                  </div>
-                  <p class="text-xs text-zinc-300 mt-1">{{ step.description }}</p>
-                </div>
-              }
-            </div>
-          </div>
-        }
-      </section>
-
       <!-- Habits Table -->
       <section>
         <div class="flex justify-between items-center mb-4">
@@ -309,15 +214,8 @@ export class HabitsComponent implements OnInit {
   newRoutine = { timeBlock: '', activity: '', dayType: 'weekday' };
   newTrigger = { type: 'time', description: '' };
 
-  combinedHabits = signal<any[]>([]);
-  selectedHabitId = signal<number | null>(null);
-  additionalExplanation = '';
-  splitting = signal(false);
-  splitResult = signal<any | null>(null);
-
   ngOnInit() {
     this.loadData();
-    this.loadCombinedHabits();
   }
 
   loadData() {
@@ -325,42 +223,6 @@ export class HabitsComponent implements OnInit {
     this.api.get<any[]>('/api/routine').subscribe(res => this.routine.set(res));
     this.api.get<any[]>('/api/triggers').subscribe(res => this.triggers.set(res));
     this.api.get<any[]>('/api/deep-dive').subscribe(res => this.qas.set(res));
-  }
-
-  loadCombinedHabits() {
-    this.api.get<any[]>('/api/agents/combined-habits').subscribe(res => {
-      this.combinedHabits.set(res);
-      if (res.length > 0) {
-        this.selectedHabitId.set(res[0].id);
-      } else {
-        this.selectedHabitId.set(null);
-      }
-    });
-  }
-
-  runMultiAgentSplit() {
-    const habitId = this.selectedHabitId();
-    if (!habitId) return;
-
-    this.splitting.set(true);
-    this.splitResult.set(null);
-
-    this.api.post<any>('/api/agents/split-habit', {
-      habitId,
-      additionalAnswer: this.additionalExplanation
-    }).subscribe({
-      next: (res) => {
-        this.splitting.set(false);
-        this.splitResult.set(res);
-        this.additionalExplanation = '';
-        this.loadData();
-        this.loadCombinedHabits();
-      },
-      error: () => {
-        this.splitting.set(false);
-        alert('Failed to execute agentic split. Please check that the Gemini API is correctly configured.');
-      }
-    });
   }
 
   generateQuestions() {

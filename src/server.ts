@@ -11,8 +11,8 @@ import { requireAuth, AuthRequest } from './middleware/auth';
 import { db } from './db/index';
 import { checkIns, habits, triggers, routineEntries, plans, nudges, coachMessages, motivationProfiles, dynamicQAs } from './db/schema';
 import { generateInitialPlan, generateNudge, generateCoachReply, revisePlan, generateDeepDiveQuestions } from './server/gemini.service';
-import { runMultiAgentHabitSplitter } from './server/agents.service';
-import { eq, desc } from 'drizzle-orm';
+import { runMultiAgentHabitSplitter, autoAnalyzeAndRefineProfile } from './server/agents.service';
+import { eq, desc, and } from 'drizzle-orm';
 import { z } from 'zod';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -141,6 +141,13 @@ app.post('/api/onboarding/submit', requireAuth, validate(onboardingSchema), asyn
       changeSummary: 'Initial Plan generated from onboarding.'
     });
 
+    // Run background habit/routine refiner and splitter agent
+    autoAnalyzeAndRefineProfile(userId, undefined, undefined, `Initial onboarding complete with payload: ${JSON.stringify(req.body)}`).then((agentRes) => {
+      console.log('Background Onboarding Refinement Agent success:', agentRes);
+    }).catch((agentErr) => {
+      console.error('Background Onboarding Refinement Agent error:', agentErr);
+    });
+
     res.json({ success: true });
   } catch (error) {
     console.error('Failed to submit onboarding', error);
@@ -163,6 +170,13 @@ app.post('/api/coach/message', requireAuth, async (req: AuthRequest, res: Respon
     
     // Save model message
     const replyRecord = await db.insert(coachMessages).values({ userId, role: 'model', message: replyText || '' }).returning();
+
+    // Run background habit/routine refiner and splitter agent based on conversation
+    autoAnalyzeAndRefineProfile(userId, message, replyText).then((agentRes) => {
+      console.log('Background Conversation Refinement Agent success:', agentRes);
+    }).catch((agentErr) => {
+      console.error('Background Conversation Refinement Agent error:', agentErr);
+    });
 
     res.json(replyRecord[0]);
   } catch (error) {
@@ -244,9 +258,18 @@ app.post('/api/habits', requireAuth, async (req: AuthRequest, res: Response) => 
 
 app.delete('/api/habits/:id', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    await db.delete(habits).where(eq(habits.id, Number(req.params.id)));
+    const habitId = Number(req.params.id);
+    const userId = req.dbUser.id;
+    // 1. Delete associated triggers
+    await db.delete(triggers).where(and(eq(triggers.userId, userId), eq(triggers.habitId, habitId)));
+    // 2. Delete associated check-ins
+    await db.delete(checkIns).where(and(eq(checkIns.userId, userId), eq(checkIns.habitId, habitId)));
+    // 3. Delete the habit itself
+    await db.delete(habits).where(and(eq(habits.userId, userId), eq(habits.id, habitId)));
     res.json({ success: true });
-  } catch (error) { res.status(500).json({ error: 'Internal server error' }); }
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/routine', requireAuth, async (req: AuthRequest, res: Response) => {
@@ -354,9 +377,25 @@ app.post('/api/deep-dive/generate', requireAuth, async (req: AuthRequest, res: R
 
 app.post('/api/deep-dive/:id/answer', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.dbUser.id;
     const qaId = Number(req.params.id);
     const { answer } = req.body;
+    
+    // Fetch question for context
+    const qaRecords = await db.select().from(dynamicQAs).where(eq(dynamicQAs.id, qaId));
+    
     await db.update(dynamicQAs).set({ answer }).where(eq(dynamicQAs.id, qaId));
+
+    if (qaRecords.length > 0) {
+      const question = qaRecords[0].question;
+      // Background agentic analysis based on deep-dive question/answer
+      autoAnalyzeAndRefineProfile(userId, undefined, undefined, `Deep-dive Question: "${question}"\nUser Answer: "${answer}"`).then((agentRes) => {
+        console.log('Background Deep-Dive Refinement Agent success:', agentRes);
+      }).catch((agentErr) => {
+        console.error('Background Deep-Dive Refinement Agent error:', agentErr);
+      });
+    }
+
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });

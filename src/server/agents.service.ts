@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { GoogleGenAI, Type } from '@google/genai';
 import { db } from '../db/index';
-import { habits, routineEntries, triggers } from '../db/schema';
+import { habits, routineEntries, triggers, checkIns } from '../db/schema';
 import { eq, and } from 'drizzle-orm';
 
 // Initialize GoogleGenAI SDK on the server side
@@ -60,9 +60,12 @@ export async function add_trigger(userId: number, type: string, description: str
 }
 
 export async function delete_habit(userId: number, id: number) {
-  await db.delete(habits).where(and(eq(habits.userId, userId), eq(habits.id, id)));
-  // Clean up any triggers referencing this habit id
+  // 1. Clean up triggers referencing this habit id
   await db.delete(triggers).where(and(eq(triggers.userId, userId), eq(triggers.habitId, id)));
+  // 2. Clean up check-ins referencing this habit id
+  await db.delete(checkIns).where(and(eq(checkIns.userId, userId), eq(checkIns.habitId, id)));
+  // 3. Delete the habit itself
+  await db.delete(habits).where(and(eq(habits.userId, userId), eq(habits.id, id)));
   return { success: true };
 }
 
@@ -259,19 +262,11 @@ Return a JSON object in the following format:
   // Step 4: Data Synchronizer executing real database tools
   steps.push({
     agent: 'Root Coordinator Agent',
-    description: 'Coordinating multi-agent changes. Triggering database tools to delete old combined habit and insert new items.',
+    description: 'Coordinating multi-agent changes. Triggering database tools to insert new items and migrate history.',
     action: 'Tool Execution Phase'
   });
 
-  // Deleting combined habit
-  await delete_habit(userId, combinedHabitId);
-  steps.push({
-    agent: 'Root Coordinator Agent',
-    description: `Database Tool executed: delete_habit on ID ${combinedHabitId}`,
-    action: 'Database Deletion'
-  });
-
-  // Inserting new split habits
+  // 1. Inserting new split habits FIRST
   const newHabitRecords: any[] = [];
   for (const h of parsedSplit.habits) {
     const record = await add_habit(userId, h.name, h.frequency, h.episodeDescription, h.durationHistory);
@@ -284,7 +279,28 @@ Return a JSON object in the following format:
     });
   }
 
-  // Inserting routine entries
+  // 2. Reassign existing check-ins to the first newly created habit to preserve history
+  if (newHabitRecords.length > 0) {
+    const firstNewHabitId = newHabitRecords[0].id;
+    await db.update(checkIns)
+      .set({ habitId: firstNewHabitId })
+      .where(and(eq(checkIns.userId, userId), eq(checkIns.habitId, combinedHabitId)));
+    steps.push({
+      agent: 'Root Coordinator Agent',
+      description: `Database Tool executed: Reassigned existing check-ins to the new habit "${newHabitRecords[0].name}"`,
+      action: 'Database Update'
+    });
+  }
+
+  // 3. Deleting old combined habit (this will clean up triggers referencing it)
+  await delete_habit(userId, combinedHabitId);
+  steps.push({
+    agent: 'Root Coordinator Agent',
+    description: `Database Tool executed: delete_habit on old combined habit ID ${combinedHabitId}`,
+    action: 'Database Deletion'
+  });
+
+  // 4. Inserting routine entries
   for (const r of parsedModeling.routines) {
     const record = await add_routine_entry(userId, r.timeBlock, r.activity, r.dayType);
     steps.push({
@@ -295,7 +311,7 @@ Return a JSON object in the following format:
     });
   }
 
-  // Inserting triggers (referencing the newly inserted habits where applicable)
+  // 5. Inserting triggers (referencing the newly inserted habits where applicable)
   for (let i = 0; i < parsedModeling.triggers.length; i++) {
     const t = parsedModeling.triggers[i];
     // Map trigger to one of the newly created habits if logical, alternating or matching
@@ -320,4 +336,154 @@ Return a JSON object in the following format:
     message: `Successfully split combined habit "${targetHabit.name}" into two detailed habits: "${parsedSplit.habits[0].name}" and "${parsedSplit.habits[1].name}". Corresponding routine entries and triggers were also designed and inserted.`,
     steps
   };
+}
+
+export async function autoAnalyzeAndRefineProfile(
+  userId: number,
+  latestUserMessage?: string,
+  latestCoachReply?: string,
+  qaContext?: string
+) {
+  try {
+    const profile = await get_user_profile(userId);
+    
+    const prompt = `You are the Background Habit & Routine Refiner Agent.
+Your job is to read:
+1. The user's current habits (with IDs):
+${JSON.stringify(profile.habits.map(h => ({ id: h.id, name: h.name, frequency: h.frequency, episodeDescription: h.episodeDescription, durationHistory: h.durationHistory })))}
+
+2. The user's current routines:
+${JSON.stringify(profile.routines.map(r => ({ timeBlock: r.timeBlock, activity: r.activity, dayType: r.dayType })))}
+
+3. The user's current triggers:
+${JSON.stringify(profile.triggers.map(t => ({ type: t.type, description: t.description })))}
+
+4. The new user information / context:
+- Latest User Statement: "${latestUserMessage || 'None'}"
+- Latest Coach Response: "${latestCoachReply || 'None'}"
+- QA / Assessment Context: "${qaContext || 'None'}"
+
+Analyze this new information. Determine if:
+- Any new habit is mentioned that isn't in their habits list. If so, create an action to add it.
+- Any routine entry is mentioned that isn't in their routines list. If so, create an action to add it.
+- Any trigger is mentioned that isn't in their triggers list. If so, create an action to add it.
+- Any existing habit is combined (for example, contains "and", "or", or a comma "," like "using phone, and sleep schedule"). If you spot such a habit, suggest a "split_habit" action on its ID.
+- Any habit should be deleted or is explicitly stated as completed/removed. If so, create an action to delete it.
+
+Only execute actions if they are highly confident and directly supported by the new user information or context.
+Return a list of suggested actions in the specified JSON format.`;
+
+    const response = await ai.models.generateContent({
+      model: MODEL_NAME,
+      contents: prompt,
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            actions: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  type: { 
+                    type: Type.STRING, 
+                    description: "Type of action to perform. Allowed values: 'add_habit', 'add_routine', 'add_trigger', 'split_habit', 'delete_habit'" 
+                  },
+                  add_habit_data: {
+                    type: Type.OBJECT,
+                    properties: {
+                      name: { type: Type.STRING },
+                      frequency: { type: Type.STRING },
+                      episodeDescription: { type: Type.STRING },
+                      durationHistory: { type: Type.STRING }
+                    }
+                  },
+                  add_routine_data: {
+                    type: Type.OBJECT,
+                    properties: {
+                      timeBlock: { type: Type.STRING },
+                      activity: { type: Type.STRING },
+                      dayType: { type: Type.STRING }
+                    }
+                  },
+                  add_trigger_data: {
+                    type: Type.OBJECT,
+                    properties: {
+                      type: { type: Type.STRING },
+                      description: { type: Type.STRING }
+                    }
+                  },
+                  split_habit_data: {
+                    type: Type.OBJECT,
+                    properties: {
+                      habitId: { type: Type.INTEGER },
+                      additionalExplanation: { type: Type.STRING }
+                    }
+                  },
+                  delete_habit_data: {
+                    type: Type.OBJECT,
+                    properties: {
+                      habitId: { type: Type.INTEGER }
+                    }
+                  }
+                },
+                required: ["type"]
+              }
+            }
+          },
+          required: ["actions"]
+        }
+      }
+    });
+
+    if (!response.text) return { success: false, message: 'No response from model' };
+    const result = JSON.parse(response.text);
+
+    const executedActions: string[] = [];
+
+    for (const action of result.actions || []) {
+      if (action.type === 'add_habit' && action.add_habit_data) {
+        const d = action.add_habit_data;
+        if (d.name) {
+          await add_habit(userId, d.name, d.frequency || 'Daily', d.episodeDescription || 'Added automatically', d.durationHistory || 'Unknown');
+          executedActions.push(`Added habit "${d.name}"`);
+        }
+      } else if (action.type === 'add_routine' && action.add_routine_data) {
+        const d = action.add_routine_data;
+        if (d.timeBlock && d.activity) {
+          await add_routine_entry(userId, d.timeBlock, d.activity, d.dayType || 'weekday');
+          executedActions.push(`Added routine entry "${d.activity}" at "${d.timeBlock}"`);
+        }
+      } else if (action.type === 'add_trigger' && action.add_trigger_data) {
+        const d = action.add_trigger_data;
+        if (d.type && d.description) {
+          await add_trigger(userId, d.type, d.description);
+          executedActions.push(`Added trigger of type ${d.type}: "${d.description}"`);
+        }
+      } else if (action.type === 'split_habit' && action.split_habit_data) {
+        const d = action.split_habit_data;
+        // Verify habitId exists in profile
+        if (profile.habits.some(h => h.id === d.habitId)) {
+          console.log(`Auto-splitting habit ${d.habitId} in the background...`);
+          await runMultiAgentHabitSplitter(userId, d.habitId, d.additionalExplanation);
+          executedActions.push(`Split combined habit ID ${d.habitId}`);
+        }
+      } else if (action.type === 'delete_habit' && action.delete_habit_data) {
+        const d = action.delete_habit_data;
+        if (profile.habits.some(h => h.id === d.habitId)) {
+          await delete_habit(userId, d.habitId);
+          executedActions.push(`Deleted habit ID ${d.habitId}`);
+        }
+      }
+    }
+
+    return {
+      success: true,
+      executedActions
+    };
+  } catch (error) {
+    console.error('Failed to run auto background analysis & refinement:', error);
+    return { success: false, error: String(error) };
+  }
 }
