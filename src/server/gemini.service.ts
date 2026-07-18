@@ -1,10 +1,10 @@
 import { GoogleGenAI } from '@google/genai';
 import { db } from '../db/index';
-import { checkIns, habits, triggers, routineEntries, plans } from '../db/schema';
+import { checkIns, triggers, plans } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const model = 'gemini-2.5-flash';
+const model = 'gemini-3.1-flash-lite';
 
 export async function generateInitialPlan(answers: any) {
   const prompt = `You are an expert behavioral coach helping a user overcome harmful habits.
