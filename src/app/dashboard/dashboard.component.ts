@@ -26,12 +26,17 @@ import { DatePipe } from '@angular/common';
       @if (nudges().length > 0) {
         <div class="mb-8 space-y-4">
           @for (nudge of nudges(); track nudge.id) {
-            <div class="p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-xl flex items-start gap-4">
-              <span class="material-icons text-emerald-400 mt-1">lightbulb</span>
-              <div class="flex-1">
-                <p class="text-emerald-100">{{ nudge.content }}</p>
-                <div class="mt-2 text-xs text-emerald-500/70">{{ nudge.generatedAt | date:'medium' }}</div>
+            <div class="p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-xl flex items-start justify-between gap-4">
+              <div class="flex items-start gap-4 flex-1">
+                <span class="material-icons text-emerald-400 mt-1">lightbulb</span>
+                <div class="flex-1">
+                  <p class="text-emerald-100">{{ nudge.content }}</p>
+                  <div class="mt-2 text-xs text-emerald-500/70">{{ nudge.generatedAt | date:'medium' }}</div>
+                </div>
               </div>
+              <button (click)="dismissNudge(nudge.id)" class="text-zinc-400 hover:text-zinc-200 transition-colors p-1 rounded-lg hover:bg-zinc-800/40 flex items-center justify-center" aria-label="Dismiss nudge">
+                <span class="material-icons text-sm">close</span>
+              </button>
             </div>
           }
         </div>
@@ -215,6 +220,17 @@ export class DashboardComponent implements OnInit {
       },
       error: () => {
         this.loadingNudge.set(false);
+      }
+    });
+  }
+
+  dismissNudge(id: number) {
+    this.api.post(`/api/nudges/${id}/dismiss`, {}).subscribe({
+      next: () => {
+        this.api.get<any[]>('/api/nudges').subscribe(n => this.nudges.set(n));
+      },
+      error: (err) => {
+        console.error('Failed to dismiss nudge', err);
       }
     });
   }

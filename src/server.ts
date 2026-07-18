@@ -12,7 +12,7 @@ import { db } from './db/index';
 import { checkIns, habits, triggers, routineEntries, plans, nudges, coachMessages, motivationProfiles, dynamicQAs } from './db/schema';
 import { generateInitialPlan, generateNudge, generateCoachReply, revisePlan, generateDeepDiveQuestions } from './server/gemini.service';
 import { runMultiAgentHabitSplitter, autoAnalyzeAndRefineProfile } from './server/agents.service';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, or, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
@@ -328,8 +328,26 @@ app.post('/api/nudges/generate', requireAuth, async (req: AuthRequest, res: Resp
 
 app.get('/api/nudges', requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const activeNudges = await db.select().from(nudges).where(eq(nudges.userId, req.dbUser.id)).orderBy(desc(nudges.generatedAt)).limit(5);
+    const activeNudges = await db.select().from(nudges)
+      .where(and(
+        eq(nudges.userId, req.dbUser.id),
+        or(eq(nudges.dismissed, false), isNull(nudges.dismissed))
+      ))
+      .orderBy(desc(nudges.generatedAt))
+      .limit(5);
     res.json(activeNudges);
+  } catch (error) {
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/nudges/:id/dismiss', requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const nudgeId = Number(req.params.id);
+    await db.update(nudges)
+      .set({ dismissed: true })
+      .where(and(eq(nudges.id, nudgeId), eq(nudges.userId, req.dbUser.id)));
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error' });
   }
