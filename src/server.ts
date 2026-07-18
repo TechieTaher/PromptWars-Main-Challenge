@@ -444,17 +444,13 @@ app.use((req, res, next) => {
 });
 
 /**
- * Start the server if this module is the main entry point, or it is ran via PM2.
- * The server listens on the port defined by the `PORT` environment variable, or defaults to 4000.
+ * Start the server if this module is the main entry point, it is ran via PM2, or we are in production.
+ * The server listens on the port defined by the `PORT` environment variable, or defaults to 3000 in production / 4000 otherwise.
  */
-if (isMainModule(import.meta.url) || process.env['pm_id']) {
-  const port = process.env['PORT'] || 4000;
-  app.listen(port, (error) => {
-    if (error) {
-      throw error;
-    }
-
-    console.log(`Node Express server listening on http://localhost:${port}`);
+if (isMainModule(import.meta.url) || process.env['pm_id'] || process.env['NODE_ENV'] === 'production') {
+  const port = process.env['PORT'] || (process.env['NODE_ENV'] === 'production' ? '3000' : '4000');
+  app.listen(port, () => {
+    console.log(`Node Express server listening in ${process.env['NODE_ENV'] || 'development'} mode on http://localhost:${port}`);
   });
 }
 
